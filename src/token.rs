@@ -25,8 +25,8 @@ pub enum TokenType {
 
     // Literals.
     Identifier(String),
-    Text(String), // Instead of String to avoid name conflict
-    Number(String),
+    Text(String),   // Instead of String to avoid name conflict
+    Number(String), // or isize, maybe?
 
     // Keywords.
     And,
@@ -49,11 +49,9 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct TokenPosition {
-    start: usize,
-    end: usize,
-}
-
 #[derive(Debug, Clone)]
-pub struct Token(TokenType, TokenPosition);
+pub struct Token {
+    pub tokenType: TokenType,
+    pub lexeme: &'static str,
+    pub line: usize,
+}

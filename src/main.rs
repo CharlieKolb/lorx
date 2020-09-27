@@ -3,10 +3,10 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+mod scanner;
 mod token;
 
 const DEFAULT_PROGRAM_PATH: &'static str = "./programs/helloWorld.lox";
-
 
 fn read_program() -> std::io::Result<String> {
     // Prints each argument on a separate line
@@ -29,5 +29,6 @@ fn main() -> std::io::Result<()> {
     let text = read_program()?;
     // let tokens = tokenize(&text);
     // println!("{:?}", tokens);
+    let x = scanner::Scanner::new(String::from("hi"));
     Ok(())
 }
