@@ -27,6 +27,8 @@ pub enum TokenType {
     Identifier(String),
     Text(String),   // Instead of String to avoid name conflict
     Number(String), // or isize, maybe?
+    Comment(String),
+    Whitespace(String),
 
     // Keywords.
     And,
@@ -52,6 +54,6 @@ pub enum TokenType {
 #[derive(Debug, Clone)]
 pub struct Token {
     pub tokenType: TokenType,
-    pub lexeme: &'static str,
+    pub lexeme: String,
     pub line: usize,
 }

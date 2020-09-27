@@ -28,7 +28,6 @@ fn read_program() -> std::io::Result<String> {
 fn main() -> std::io::Result<()> {
     let text = read_program()?;
     // let tokens = tokenize(&text);
-    // println!("{:?}", tokens);
-    let x = scanner::Scanner::new(String::from("hi"));
+    println!("{:?}", scanner::scanTokens(text.chars()));
     Ok(())
 }
