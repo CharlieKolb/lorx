@@ -51,8 +51,8 @@ pub enum TokenType {
 
 #[derive(Debug, Copy, Clone)]
 pub struct TokenPosition {
-    start: isize,
-    end: isize,
+    start: usize,
+    end: usize,
 }
 
 #[derive(Debug, Clone)]
