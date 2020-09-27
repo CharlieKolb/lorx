@@ -12,7 +12,7 @@ pub struct ScanState<'a> {
     line: usize,
 }
 
-fn scanToken<'a>(
+fn scan_token<'a>(
     c: char,
     iter: &mut Peekable<Chars<'a>>,
     current: &mut usize,
@@ -78,15 +78,15 @@ fn scanToken<'a>(
     }
 }
 
-pub fn scanTokens<'a>(inputChars: Chars<'a>) -> Vec<Token> {
-    let mut inputPeekable = inputChars.peekable();
+pub fn scan_tokens<'a>(input_chars: Chars<'a>) -> Vec<Token> {
+    let mut input_peekable = input_chars.peekable();
 
     let mut current = 0;
     let mut line = 1;
 
     let mut out = vec![];
-    while let Some(c) = inputPeekable.next() {
-        out.push(scanToken(c, &mut inputPeekable, &mut current, &mut line))
+    while let Some(c) = input_peekable.next() {
+        out.push(scan_token(c, &mut input_peekable, &mut current, &mut line))
     }
     out
 }
