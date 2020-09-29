@@ -41,7 +41,7 @@ pub fn keyword_to_token_type(s: &String) -> Option<TokenType> {
 //     ].iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
 // }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -70,8 +70,6 @@ pub enum TokenType {
     Identifier(String),
     Text(String), // Instead of String to avoid name conflict
     Number(f64),
-    Comment(String),
-    Whitespace(String),
 
     // Keywords.
     And,
@@ -90,8 +88,6 @@ pub enum TokenType {
     True,
     Var,
     While,
-
-    Eof,
 }
 
 #[derive(Debug, Clone)]

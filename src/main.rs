@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+mod parser;
 mod scanner;
 mod token;
 
@@ -27,7 +28,9 @@ fn read_program() -> std::io::Result<String> {
 
 fn main() -> std::io::Result<()> {
     let text = read_program()?;
-    // let tokens = tokenize(&text);
-    println!("{:?}", scanner::scan_tokens(text.chars()));
+    let tokens = scanner::scan_tokens(text.chars()).ok().unwrap_or_default(); // todo handle tokenization errors
+    println!("{:?}", tokens);
+    let parse_tree = parser::parse(tokens);
+    println!("{:#?}", parse_tree);
     Ok(())
 }
