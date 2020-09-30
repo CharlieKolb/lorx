@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+mod interpreter;
 mod parser;
 mod scanner;
 mod token;
@@ -32,5 +33,11 @@ fn main() -> std::io::Result<()> {
     println!("{:?}", tokens);
     let parse_tree = parser::parse(tokens);
     println!("{:#?}", parse_tree);
+    let res = parse_tree
+        .unwrap()
+        .into_iter()
+        .map(|expr| interpreter::evaluate(expr))
+        .collect::<Vec<_>>();
+    println!("{:#?}", res);
     Ok(())
 }

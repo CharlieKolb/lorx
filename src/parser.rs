@@ -7,7 +7,7 @@ pub enum Expr {
     Leaf(Token),
     Unary(Token, Box<Expr>),
     Binary(Token, Box<Expr>, Box<Expr>),
-    Grouping(Token, Token, Box<Expr>),
+    Grouping(Box<Expr>),
 }
 
 fn match_next(
@@ -34,13 +34,13 @@ fn parse_primary(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result
         let expr = parse_equality(&mut iter)?;
 
         if iter
-            .peek()
+            .next()
             .filter(|t| t.token_type == TokenType::RightParen)
             .is_none()
         {
             return Err(1); // Missing closing brace
         }
-        return Ok(Expr::Grouping(op, iter.next().unwrap(), Box::new(expr)));
+        return Ok(Expr::Grouping(Box::new(expr)));
     }
 
     // Only options left are literals

@@ -38,10 +38,20 @@ fn get_next_token_type<'a>(
     };
 
     Ok(match c {
-        ' ' | '\r' | '\t' => get_next_token_type(iter.next().ok_or::<usize>(5)?, &mut iter, &mut current, &mut line)?,
+        ' ' | '\r' | '\t' => get_next_token_type(
+            iter.next().ok_or::<usize>(5)?,
+            &mut iter,
+            &mut current,
+            &mut line,
+        )?,
         '\n' => {
             *line += 1;
-            get_next_token_type(iter.next().ok_or::<usize>(6)?, &mut iter, &mut current, &mut line)?
+            get_next_token_type(
+                iter.next().ok_or::<usize>(6)?,
+                &mut iter,
+                &mut current,
+                &mut line,
+            )?
         }
         '(' => TokenType::LeftParen,
         ')' => TokenType::RightParen,
@@ -115,7 +125,7 @@ fn get_next_token_type<'a>(
                 res.push('.');
 
                 while let Some(&next_c) = iter.peek() {
-                    if !is_digit(c) {
+                    if !is_digit(next_c) {
                         iter.reset_peek();
                         break;
                     }
@@ -151,9 +161,8 @@ fn get_next_token_type<'a>(
             }
         }
         // todo handle unsupported characters with an error type or something
-        _ => return Err(0)
-    }
-    )
+        _ => return Err(0),
+    })
 }
 
 fn scan_token<'a>(
