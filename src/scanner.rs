@@ -177,7 +177,7 @@ fn scan_token<'a>(
     })
 }
 
-pub fn scan_tokens<'a>(input_chars: Chars<'a>) -> Result<Vec<Token>, usize> {
+pub fn scan_tokens<'a>(input_chars: Chars<'a>) -> Vec<Token> {
     let mut input_mpeek = itertools::multipeek(input_chars);
 
     let mut current = 0;
@@ -185,7 +185,9 @@ pub fn scan_tokens<'a>(input_chars: Chars<'a>) -> Result<Vec<Token>, usize> {
 
     let mut out = vec![];
     while let Some(c) = input_mpeek.next() {
-        out.push(scan_token(c, &mut input_mpeek, &mut current, &mut line)?)
+        if let Ok(t) = scan_token(c, &mut input_mpeek, &mut current, &mut line) {
+            out.push(t)
+        }
     }
-    Ok(out)
+    out
 }

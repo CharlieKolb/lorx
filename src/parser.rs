@@ -10,6 +10,12 @@ pub enum Expr {
     Grouping(Box<Expr>),
 }
 
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
 fn match_next(
     iter: &mut Peekable<impl Iterator<Item = Token>>,
     options: &[TokenType],
@@ -30,16 +36,13 @@ fn parse_primary(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result
         return Ok(Expr::Leaf(op));
     }
 
-    if let Some(op) = match_next(&mut iter, &[TokenType::LeftParen]) {
+    if let Some(_) = match_next(&mut iter, &[TokenType::LeftParen]) {
         let expr = parse_equality(&mut iter)?;
 
-        if iter
-            .next()
-            .filter(|t| t.token_type == TokenType::RightParen)
-            .is_none()
-        {
+        if match_next(&mut iter, &[TokenType::RightParen]).is_none() {
             return Err(1); // Missing closing brace
         }
+
         return Ok(Expr::Grouping(Box::new(expr)));
     }
 
@@ -106,14 +109,49 @@ fn parse_equality(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Resul
     Ok(lhs)
 }
 
-pub fn parse<'a, I>(tokens: I) -> Result<Vec<Expr>, usize>
+fn parse_print(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    if match_next(&mut iter, &[TokenType::Print]).is_some() {
+        let expr = parse_equality(&mut iter)?;
+        if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
+            Err(22)
+        } else {
+            Ok(Stmt::Print(expr))
+        }
+    } else {
+        Err(21)
+    }
+}
+
+fn parse_expression(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    let expr = parse_equality(&mut iter)?;
+    if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
+        Err(22)
+    } else {
+        Ok(Stmt::Expression(expr))
+    }
+}
+
+fn parse_stmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    if let Some(_) = iter.peek() {
+        return parse_print(&mut iter);
+    }
+
+    parse_expression(&mut iter)
+}
+
+pub fn parse<'a, I>(tokens: I) -> Vec<Stmt>
 where
     I: IntoIterator<Item = Token>,
 {
     let mut res = vec![];
     let mut iter = tokens.into_iter().peekable();
     while !iter.peek().is_none() {
-        res.push(parse_equality(&mut iter)?);
+        if let Ok(stmt) = parse_stmt(&mut iter) {
+            res.push(stmt);
+        }
+        else {
+            iter.next(); // skip unparsable token
+        }
     }
-    Ok(res)
+    res
 }

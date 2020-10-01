@@ -29,15 +29,11 @@ fn read_program() -> std::io::Result<String> {
 
 fn main() -> std::io::Result<()> {
     let text = read_program()?;
-    let tokens = scanner::scan_tokens(text.chars()).ok().unwrap_or_default(); // todo handle tokenization errors
+    let tokens = scanner::scan_tokens(text.chars()); // todo handle tokenization errors
     println!("{:?}", tokens);
     let parse_tree = parser::parse(tokens);
     println!("{:#?}", parse_tree);
-    let res = parse_tree
-        .unwrap()
-        .into_iter()
-        .map(|expr| interpreter::evaluate(expr))
-        .collect::<Vec<_>>();
+    let res = interpreter::evaluate(parse_tree);
     println!("{:#?}", res);
     Ok(())
 }
