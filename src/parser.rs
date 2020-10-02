@@ -5,6 +5,7 @@ use std::iter::Peekable;
 #[derive(Debug, Clone)]
 pub enum Expr {
     Leaf(Token),
+    // Variable(Token), // probably won't need this?
     Unary(Token, Box<Expr>),
     Binary(Token, Box<Expr>, Box<Expr>),
     Grouping(Box<Expr>),
@@ -14,6 +15,7 @@ pub enum Expr {
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
+    Var(Token, Expr),
 }
 
 fn match_next(
@@ -46,9 +48,17 @@ fn parse_primary(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result
         return Ok(Expr::Grouping(Box::new(expr)));
     }
 
-    // Only options left are literals
+    // Only options left are literals/variables
     if let Some(t) = iter.next() {
-        Ok(Expr::Leaf(t))
+        Ok(match t.token_type {
+            TokenType::Number(_)
+            | TokenType::Text(_)
+            | TokenType::True
+            | TokenType::False
+            | TokenType::Nil
+            | TokenType::Identifier(_) => Expr::Leaf(t),
+            _ => return Err(33),
+        })
     } else {
         Err(0) // Ran out of elements
     }
@@ -122,7 +132,7 @@ fn parse_print(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<S
     }
 }
 
-fn parse_expression(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+fn parse_exprstmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
     let expr = parse_equality(&mut iter)?;
     if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
         Err(22)
@@ -136,7 +146,41 @@ fn parse_stmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<St
         return parse_print(&mut iter);
     }
 
-    parse_expression(&mut iter)
+    parse_exprstmt(&mut iter)
+}
+
+fn parse_vardecl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    if let Some(_) = match_next(&mut iter, &[TokenType::Var]) {
+        if let Some(id) = iter.next() {
+            match id {
+                t
+                @
+                Token {
+                    token_type: TokenType::Identifier(_),
+                    ..
+                } => {
+                    let expr = if match_next(&mut iter, &[TokenType::Equal]).is_some() {
+                        parse_equality(&mut iter)?
+                    } else {
+                        Expr::Leaf(Token {
+                            token_type: TokenType::Nil,
+                            line: t.line,
+                        })
+                    };
+                    Ok(Stmt::Var(t, expr))
+                }
+                _ => Err(32),
+            }
+        } else {
+            Err(31)
+        }
+    } else {
+        Err(30)
+    }
+}
+
+fn parse_decl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    parse_vardecl(&mut iter).or_else(|_| parse_stmt(&mut iter))
 }
 
 pub fn parse<'a, I>(tokens: I) -> Vec<Stmt>
@@ -146,10 +190,9 @@ where
     let mut res = vec![];
     let mut iter = tokens.into_iter().peekable();
     while !iter.peek().is_none() {
-        if let Ok(stmt) = parse_stmt(&mut iter) {
+        if let Ok(stmt) = parse_decl(&mut iter) {
             res.push(stmt);
-        }
-        else {
+        } else {
             iter.next(); // skip unparsable token
         }
     }

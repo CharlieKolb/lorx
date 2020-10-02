@@ -1,4 +1,4 @@
-use crate::parser::{ Expr, Stmt };
+use crate::parser::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,11 +117,22 @@ fn eval_print(expr: Expr) -> Result<(), usize> {
     Ok(())
 }
 
+fn eval_decl(token: Token, expr: Expr) -> Result<(), usize> {
+    Ok(())
+}
+
 pub fn evaluate(stmts: Vec<Stmt>) -> Result<(), usize> {
     for stmt in stmts {
         match stmt {
-            Stmt::Expression(expr) => { eval_expr(expr)?; },
-            Stmt::Print(expr) => { eval_print(expr)?; } ,
+            Stmt::Expression(expr) => {
+                eval_expr(expr)?;
+            }
+            Stmt::Print(expr) => {
+                eval_print(expr)?;
+            }
+            Stmt::Var(token, expr) => {
+                eval_decl(token, expr)?;
+            }
         }
     }
 
