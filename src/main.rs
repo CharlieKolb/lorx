@@ -3,10 +3,13 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+mod environment;
+mod value;
 mod interpreter;
 mod parser;
 mod scanner;
 mod token;
+
 
 const DEFAULT_PROGRAM_PATH: &'static str = "./programs/helloWorld.lox";
 
@@ -33,7 +36,9 @@ fn main() -> std::io::Result<()> {
     println!("{:?}", tokens);
     let parse_tree = parser::parse(tokens);
     println!("{:#?}", parse_tree);
-    let res = interpreter::evaluate(parse_tree);
+    let mut interpreter : interpreter::Interpreter = Default::default();
+    let res = interpreter.evaluate(parse_tree);
     println!("{:#?}", res);
+    println!("{:#?}", interpreter);
     Ok(())
 }
