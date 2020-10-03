@@ -142,7 +142,7 @@ fn parse_exprstmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Resul
 }
 
 fn parse_stmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    if let Some(_) = iter.peek() {
+    if let Some(TokenType::Print) = iter.peek().map(|t| &t.token_type)  {
         return parse_print(&mut iter);
     }
 
