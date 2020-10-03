@@ -1,7 +1,6 @@
 var x  =  "hello";
+var y = 5;
+x = (1 + (y = 4));
 
 print x;
-
-var x = x + " world!";
-
-print x;
+print y;

@@ -6,6 +6,7 @@ use std::iter::Peekable;
 pub enum Expr {
     Leaf(Token),
     // Variable(Token), // probably won't need this?
+    Assign(String, Box<Expr>),
     Unary(Token, Box<Expr>),
     Binary(Token, Box<Expr>, Box<Expr>),
     Grouping(Box<Expr>),
@@ -39,7 +40,7 @@ fn parse_primary(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result
     }
 
     if let Some(_) = match_next(&mut iter, &[TokenType::LeftParen]) {
-        let expr = parse_equality(&mut iter)?;
+        let expr = parse_expression(&mut iter)?;
 
         if match_next(&mut iter, &[TokenType::RightParen]).is_none() {
             return Err(1); // Missing closing brace
@@ -121,7 +122,7 @@ fn parse_equality(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Resul
 
 fn parse_print(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
     if match_next(&mut iter, &[TokenType::Print]).is_some() {
-        let expr = parse_equality(&mut iter)?;
+        let expr = parse_expression(&mut iter)?;
         if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
             Err(22)
         } else {
@@ -132,8 +133,45 @@ fn parse_print(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<S
     }
 }
 
-fn parse_exprstmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+fn parse_assignment(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
     let expr = parse_equality(&mut iter)?;
+
+    if match_next(&mut iter, &[TokenType::Equal]).is_some() {
+        let rhs = parse_assignment(&mut iter)?;
+
+        match expr {
+            Expr::Leaf(Token { token_type: TokenType::Identifier(s), .. }) =>
+                Ok(Expr::Assign(s, Box::new(rhs))),
+            _ => Err(42),
+
+        }
+    }
+    else {
+        Ok(expr)
+    }
+
+
+    // match iter.peek().map(|t| &t.token_type) {
+    //     Some(&TokenType::Identifier(_)) => {
+    //         let lhs = iter.next().unwrap(); // peeked in the match
+    //         if match_next(&mut iter, &[TokenType::Equal]).is_some() {
+    //             let rhs = parse_assignment(&mut iter)?;
+    //             Ok(Expr::Assign(lhs, Box::new(rhs)))
+    //         }
+    //         else {
+    //             Err(41)
+    //         }
+    //     }
+    //     _ => parse_equality(&mut iter)
+    // }
+}
+
+fn parse_expression(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
+    parse_assignment(&mut iter)
+}
+
+fn parse_exprstmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    let expr = parse_expression(&mut iter)?;
     if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
         Err(22)
     } else {
@@ -160,14 +198,18 @@ fn parse_vardecl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result
                     ..
                 } => {
                     let expr = if match_next(&mut iter, &[TokenType::Equal]).is_some() {
-                        parse_equality(&mut iter)?
+                        parse_expression(&mut iter)?
                     } else {
                         Expr::Leaf(Token {
                             token_type: TokenType::Nil,
                             line: t.line,
                         })
                     };
-                    Ok(Stmt::Var(t, expr))
+                    if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
+                        Err(44)
+                    } else {
+                        Ok(Stmt::Var(t, expr))
+                    }
                 }
                 _ => Err(32),
             }
@@ -180,7 +222,12 @@ fn parse_vardecl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result
 }
 
 fn parse_decl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    parse_vardecl(&mut iter).or_else(|_| parse_stmt(&mut iter))
+    if iter.peek().map(|t| &t.token_type) == Some(&TokenType::Var) {
+        parse_vardecl(&mut iter)
+    }
+    else {
+        parse_stmt(&mut iter)
+    }
 }
 
 pub fn parse<'a, I>(tokens: I) -> Vec<Stmt>

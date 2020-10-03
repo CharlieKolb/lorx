@@ -1,7 +1,7 @@
+use crate::environment::Environment;
 use crate::parser::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
-use crate::environment::Environment;
 
 fn cast_to_num(v: &Value) -> Result<f64, usize> {
     if let Value::Number(n) = v {
@@ -41,7 +41,12 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    fn eval_binary(&self, token: Token, lhs: Box<Expr>, rhs: Box<Expr>) -> Result<Value, usize> {
+    fn eval_binary(
+        &mut self,
+        token: Token,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    ) -> Result<Value, usize> {
         let lhs_val = self.eval_expr(*lhs)?;
         let rhs_val = self.eval_expr(*rhs)?;
 
@@ -60,7 +65,9 @@ impl Interpreter {
                 }
             }
             TokenType::Greater => Value::Boolean(cast_to_num(&lhs_val) > cast_to_num(&rhs_val)),
-            TokenType::GreaterEqual => Value::Boolean(cast_to_num(&lhs_val) >= cast_to_num(&rhs_val)),
+            TokenType::GreaterEqual => {
+                Value::Boolean(cast_to_num(&lhs_val) >= cast_to_num(&rhs_val))
+            }
             TokenType::Less => Value::Boolean(cast_to_num(&lhs_val) < cast_to_num(&rhs_val)),
             TokenType::LessEqual => Value::Boolean(cast_to_num(&lhs_val) <= cast_to_num(&rhs_val)),
             TokenType::EqualEqual => Value::Boolean(is_equal(&lhs_val, &rhs_val)),
@@ -71,7 +78,7 @@ impl Interpreter {
         })
     }
 
-    fn eval_unary(&self, token: Token, rhs: Box<Expr>) -> Result<Value, usize> {
+    fn eval_unary(&mut self, token: Token, rhs: Box<Expr>) -> Result<Value, usize> {
         let rhs_val = cast_to_num(&self.eval_expr(*rhs)?)?;
 
         match token.token_type {
@@ -80,7 +87,15 @@ impl Interpreter {
         }
     }
 
-    fn eval_leaf(& self, token: Token) -> Result<Value, usize> {
+    fn eval_assign(&mut self, name: String, rhs: Box<Expr>) -> Result<Value, usize> {
+        let rhs_val = self.eval_expr(*rhs)?;
+
+        self.environment.assign(name.as_str(), rhs_val.clone())?;
+
+        Ok(rhs_val)
+    }
+
+    fn eval_leaf(&self, token: Token) -> Result<Value, usize> {
         Ok(match token.token_type {
             TokenType::Text(s) => Value::Text(s),
             TokenType::Number(n) => Value::Number(n),
@@ -94,9 +109,10 @@ impl Interpreter {
         })
     }
 
-    fn eval_expr(& self, expr: Expr) -> Result<Value, usize> {
+    fn eval_expr(&mut self, expr: Expr) -> Result<Value, usize> {
         match expr {
-            Expr::Leaf(t) =>self. eval_leaf(t),
+            Expr::Leaf(t) => self.eval_leaf(t),
+            Expr::Assign(s, rhs) => self.eval_assign(s, rhs),
             Expr::Unary(t, rhs) => self.eval_unary(t, rhs),
             Expr::Binary(t, lhs, rhs) => self.eval_binary(t, lhs, rhs),
             Expr::Grouping(expr) => self.eval_expr(*expr),
@@ -104,18 +120,22 @@ impl Interpreter {
         }
     }
 
-    fn eval_print(&self, expr: Expr) -> Result<(), usize> {
+    fn eval_print(&mut self, expr: Expr) -> Result<(), usize> {
         let val = self.eval_expr(expr)?;
         println!("{}", val.to_string());
         Ok(())
     }
 
     fn eval_decl(&mut self, token: Token, expr: Expr) -> Result<(), usize> {
-        if let Token { token_type: TokenType::Identifier(s), .. } = token {
-            self.environment.define(&s.as_str(), self.eval_expr(expr)?);
+        if let Token {
+            token_type: TokenType::Identifier(s),
+            ..
+        } = token
+        {
+            let rhs = self.eval_expr(expr)?;
+            self.environment.define(&s.as_str(), rhs);
             Ok(())
-        }
-        else {
+        } else {
             Err(35)
         }
     }
