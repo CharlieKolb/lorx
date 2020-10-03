@@ -1,4 +1,4 @@
-use crate::environment::Environment;
+use crate::environment::{ EnvStack };
 use crate::parser::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
@@ -37,7 +37,7 @@ fn is_equal(lhs: &Value, rhs: &Value) -> bool {
 
 #[derive(Debug, Clone, Default)]
 pub struct Interpreter {
-    environment: Environment,
+    envs: EnvStack,
 }
 
 impl Interpreter {
@@ -90,7 +90,7 @@ impl Interpreter {
     fn eval_assign(&mut self, name: String, rhs: Box<Expr>) -> Result<Value, usize> {
         let rhs_val = self.eval_expr(*rhs)?;
 
-        self.environment.assign(name.as_str(), rhs_val.clone())?;
+        self.envs.assign(name.as_str(), rhs_val.clone())?;
 
         Ok(rhs_val)
     }
@@ -102,7 +102,7 @@ impl Interpreter {
             TokenType::True => Value::Boolean(true),
             TokenType::False => Value::Boolean(false),
             TokenType::Nil => Value::Nil,
-            TokenType::Identifier(s) => self.environment.get(s.as_str())?.clone(),
+            TokenType::Identifier(s) => self.envs.get(s.as_str())?.clone(),
             _ => {
                 return Err(13);
             }
@@ -133,11 +133,21 @@ impl Interpreter {
         } = token
         {
             let rhs = self.eval_expr(expr)?;
-            self.environment.define(&s.as_str(), rhs);
+            self.envs.define(&s.as_str(), rhs);
             Ok(())
         } else {
             Err(35)
         }
+    }
+
+    fn eval_block(&mut self, stmts: Vec<Stmt>) -> Result<(), usize> {
+        self.envs.push_default();
+        // take eval_res here to ensure we always call pop even on failure
+        // could use defer crate or similar for pop instead!
+        let eval_res = self.evaluate(stmts);
+        self.envs.pop()?;
+
+        eval_res
     }
 
     pub fn evaluate(&mut self, stmts: Vec<Stmt>) -> Result<(), usize> {
@@ -152,6 +162,9 @@ impl Interpreter {
                 Stmt::Var(token, expr) => {
                     self.eval_decl(token, expr)?;
                 }
+                Stmt::Block(stmts) => {
+                     self.eval_block(stmts)?; 
+                    }
             }
         }
 

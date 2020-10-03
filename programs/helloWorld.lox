@@ -1,6 +1,0 @@
-var x  =  "hello";
-var y = 5;
-x = (1 + (y = 4));
-
-print x;
-print y;

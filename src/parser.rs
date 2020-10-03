@@ -17,6 +17,7 @@ pub enum Stmt {
     Expression(Expr),
     Print(Expr),
     Var(Token, Expr),
+    Block(Vec<Stmt>),
 }
 
 fn match_next(
@@ -179,9 +180,28 @@ fn parse_exprstmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Resul
     }
 }
 
+fn parse_block(mut iter:  &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
+    if match_next(&mut iter, &[TokenType::LeftBrace]).is_none() {
+       Err(22)
+    }
+    else {
+        let mut stmts = vec![];
+        while iter.peek().is_some() && iter.peek().map(|t| &t.token_type) != Some(&TokenType::RightBrace) {
+            stmts.push(parse_decl(&mut iter)?);
+        }
+        // drop right brace
+        iter.next();
+        Ok(Stmt::Block(stmts))
+    }
+}
+
 fn parse_stmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
     if let Some(TokenType::Print) = iter.peek().map(|t| &t.token_type)  {
         return parse_print(&mut iter);
+    }
+
+    if let Some(TokenType::LeftBrace) = iter.peek().map(|t| &t.token_type)  {
+        return parse_block(&mut iter);
     }
 
     parse_exprstmt(&mut iter)

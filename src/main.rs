@@ -10,7 +10,7 @@ mod scanner;
 mod token;
 mod value;
 
-const DEFAULT_PROGRAM_PATH: &'static str = "./programs/helloWorld.lox";
+const DEFAULT_PROGRAM_PATH: &'static str = "./programs/testProgram.lox";
 
 fn read_program() -> std::io::Result<String> {
     // Prints each argument on a separate line
