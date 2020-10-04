@@ -20,233 +20,225 @@ pub enum Stmt {
     Block(Vec<Stmt>),
 }
 
-fn match_next(
-    iter: &mut Peekable<impl Iterator<Item = Token>>,
-    options: &[TokenType],
-) -> Option<Token> {
-    for token_type in options {
-        if iter.peek().map(|t| &t.token_type) == Some(&token_type) {
-            return iter.next();
-        };
-    }
-    None
+struct Parser<I>
+where
+    I: Iterator<Item = Token>,
+{
+    iter: Peekable<I>,
 }
 
-fn parse_primary(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    if let Some(op) = match_next(
-        &mut iter,
-        &[TokenType::False, TokenType::True, TokenType::Nil],
-    ) {
-        return Ok(Expr::Leaf(op));
+impl<I> Parser<I>
+where
+    I: Iterator<Item = Token>,
+{
+    fn match_next(&mut self, options: &[TokenType]) -> Option<Token> {
+        for token_type in options {
+            if self.iter.peek().map(|t| &t.token_type) == Some(&token_type) {
+                return self.iter.next();
+            };
+        }
+        None
     }
 
-    if let Some(_) = match_next(&mut iter, &[TokenType::LeftParen]) {
-        let expr = parse_expression(&mut iter)?;
-
-        if match_next(&mut iter, &[TokenType::RightParen]).is_none() {
-            return Err(1); // Missing closing brace
+    fn parse_primary(&mut self) -> Result<Expr, usize> {
+        if let Some(op) = self.match_next(&[TokenType::False, TokenType::True, TokenType::Nil]) {
+            return Ok(Expr::Leaf(op));
         }
 
-        return Ok(Expr::Grouping(Box::new(expr)));
+        if self.match_next(&[TokenType::LeftParen]).is_some() {
+            let expr = self.parse_expression()?;
+
+            if self.match_next(&[TokenType::RightParen]).is_none() {
+                return Err(1); // Missing closing brace
+            }
+
+            return Ok(Expr::Grouping(Box::new(expr)));
+        }
+
+        // Only options left are literals/variables
+        if let Some(t) = self.iter.next() {
+            Ok(match t.token_type {
+                TokenType::Number(_)
+                | TokenType::Text(_)
+                | TokenType::True
+                | TokenType::False
+                | TokenType::Nil
+                | TokenType::Identifier(_) => Expr::Leaf(t),
+                _ => return Err(33),
+            })
+        } else {
+            Err(0) // Ran out of elements
+        }
     }
 
-    // Only options left are literals/variables
-    if let Some(t) = iter.next() {
-        Ok(match t.token_type {
-            TokenType::Number(_)
-            | TokenType::Text(_)
-            | TokenType::True
-            | TokenType::False
-            | TokenType::Nil
-            | TokenType::Identifier(_) => Expr::Leaf(t),
-            _ => return Err(33),
-        })
-    } else {
-        Err(0) // Ran out of elements
-    }
-}
+    fn parse_unary(&mut self) -> Result<Expr, usize> {
+        if let Some(op) = self.match_next(&[TokenType::Bang, TokenType::Minus]) {
+            let rhs = self.parse_unary()?;
+            return Ok(Expr::Unary(op, Box::new(rhs)));
+        }
 
-fn parse_unary(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    if let Some(op) = match_next(&mut iter, &[TokenType::Bang, TokenType::Minus]) {
-        let rhs = parse_unary(&mut iter)?;
-        return Ok(Expr::Unary(op, Box::new(rhs)));
+        self.parse_primary()
     }
 
-    parse_primary(&mut iter)
-}
-
-fn parse_multiplication(
-    mut iter: &mut Peekable<impl Iterator<Item = Token>>,
-) -> Result<Expr, usize> {
-    let mut lhs = parse_unary(&mut iter)?;
-    while let Some(op) = match_next(&mut iter, &[TokenType::Slash, TokenType::Star]) {
-        let rhs = parse_unary(&mut iter)?;
-        lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+    fn parse_multiplication(&mut self) -> Result<Expr, usize> {
+        let mut lhs = self.parse_unary()?;
+        while let Some(op) = self.match_next(&[TokenType::Slash, TokenType::Star]) {
+            let rhs = self.parse_unary()?;
+            lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
     }
-    Ok(lhs)
-}
 
-fn parse_addition(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    let mut lhs = parse_multiplication(&mut iter)?;
-    while let Some(op) = match_next(&mut iter, &[TokenType::Plus, TokenType::Minus]) {
-        let rhs = parse_multiplication(&mut iter)?;
-        lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+    fn parse_addition(&mut self) -> Result<Expr, usize> {
+        let mut lhs = self.parse_multiplication()?;
+        while let Some(op) = self.match_next(&[TokenType::Plus, TokenType::Minus]) {
+            let rhs = self.parse_multiplication()?;
+            lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
     }
-    Ok(lhs)
-}
 
-fn parse_comparison(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    let mut lhs = parse_addition(&mut iter)?;
-    while let Some(op) = match_next(
-        &mut iter,
-        &[
+    fn parse_comparison(&mut self) -> Result<Expr, usize> {
+        let mut lhs = self.parse_addition()?;
+        while let Some(op) = self.match_next(&[
             TokenType::Greater,
             TokenType::GreaterEqual,
             TokenType::Less,
             TokenType::LessEqual,
-        ],
-    ) {
-        let rhs = parse_addition(&mut iter)?;
-        lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+        ]) {
+            let rhs = self.parse_addition()?;
+            lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
     }
-    Ok(lhs)
-}
 
-fn parse_equality(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    let mut lhs = parse_comparison(&mut iter)?;
-    while let Some(op) = match_next(&mut iter, &[TokenType::EqualEqual, TokenType::BangEqual]) {
-        let rhs = parse_comparison(&mut iter)?;
-        lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+    fn parse_equality(&mut self) -> Result<Expr, usize> {
+        let mut lhs = self.parse_comparison()?;
+        while let Some(op) = self.match_next(&[TokenType::EqualEqual, TokenType::BangEqual]) {
+            let rhs = self.parse_comparison()?;
+            lhs = Expr::Binary(op, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
     }
-    Ok(lhs)
-}
 
-fn parse_print(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    if match_next(&mut iter, &[TokenType::Print]).is_some() {
-        let expr = parse_expression(&mut iter)?;
-        if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
+    fn parse_print(&mut self) -> Result<Stmt, usize> {
+        let expr = self.parse_expression()?;
+        if self.match_next(&[TokenType::Semicolon]).is_none() {
             Err(22)
         } else {
             Ok(Stmt::Print(expr))
         }
-    } else {
-        Err(21)
-    }
-}
-
-fn parse_assignment(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    let expr = parse_equality(&mut iter)?;
-
-    if match_next(&mut iter, &[TokenType::Equal]).is_some() {
-        let rhs = parse_assignment(&mut iter)?;
-
-        match expr {
-            Expr::Leaf(Token { token_type: TokenType::Identifier(s), .. }) =>
-                Ok(Expr::Assign(s, Box::new(rhs))),
-            _ => Err(42),
-
-        }
-    }
-    else {
-        Ok(expr)
     }
 
+    fn parse_assignment(&mut self) -> Result<Expr, usize> {
+        let expr = self.parse_equality()?;
 
-    // match iter.peek().map(|t| &t.token_type) {
-    //     Some(&TokenType::Identifier(_)) => {
-    //         let lhs = iter.next().unwrap(); // peeked in the match
-    //         if match_next(&mut iter, &[TokenType::Equal]).is_some() {
-    //             let rhs = parse_assignment(&mut iter)?;
-    //             Ok(Expr::Assign(lhs, Box::new(rhs)))
-    //         }
-    //         else {
-    //             Err(41)
-    //         }
-    //     }
-    //     _ => parse_equality(&mut iter)
-    // }
-}
+        if self.match_next(&[TokenType::Equal]).is_some() {
+            let rhs = self.parse_assignment()?;
 
-fn parse_expression(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, usize> {
-    parse_assignment(&mut iter)
-}
-
-fn parse_exprstmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    let expr = parse_expression(&mut iter)?;
-    if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
-        Err(22)
-    } else {
-        Ok(Stmt::Expression(expr))
-    }
-}
-
-fn parse_block(mut iter:  &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    if match_next(&mut iter, &[TokenType::LeftBrace]).is_none() {
-       Err(22)
-    }
-    else {
-        let mut stmts = vec![];
-        while iter.peek().is_some() && iter.peek().map(|t| &t.token_type) != Some(&TokenType::RightBrace) {
-            stmts.push(parse_decl(&mut iter)?);
-        }
-        // drop right brace
-        iter.next();
-        Ok(Stmt::Block(stmts))
-    }
-}
-
-fn parse_stmt(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    if let Some(TokenType::Print) = iter.peek().map(|t| &t.token_type)  {
-        return parse_print(&mut iter);
-    }
-
-    if let Some(TokenType::LeftBrace) = iter.peek().map(|t| &t.token_type)  {
-        return parse_block(&mut iter);
-    }
-
-    parse_exprstmt(&mut iter)
-}
-
-fn parse_vardecl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    if let Some(_) = match_next(&mut iter, &[TokenType::Var]) {
-        if let Some(id) = iter.next() {
-            match id {
-                t
-                @
-                Token {
-                    token_type: TokenType::Identifier(_),
+            match expr {
+                Expr::Leaf(Token {
+                    token_type: TokenType::Identifier(s),
                     ..
-                } => {
-                    let expr = if match_next(&mut iter, &[TokenType::Equal]).is_some() {
-                        parse_expression(&mut iter)?
-                    } else {
-                        Expr::Leaf(Token {
-                            token_type: TokenType::Nil,
-                            line: t.line,
-                        })
-                    };
-                    if match_next(&mut iter, &[TokenType::Semicolon]).is_none() {
-                        Err(44)
-                    } else {
-                        Ok(Stmt::Var(t, expr))
-                    }
-                }
-                _ => Err(32),
+                }) => Ok(Expr::Assign(s, Box::new(rhs))),
+                _ => Err(42),
             }
         } else {
-            Err(31)
+            Ok(expr)
         }
-    } else {
-        Err(30)
-    }
-}
 
-fn parse_decl(mut iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, usize> {
-    if iter.peek().map(|t| &t.token_type) == Some(&TokenType::Var) {
-        parse_vardecl(&mut iter)
+        // match iter.peek().map(|t| &t.token_type) {
+        //     Some(&TokenType::Identifier(_)) => {
+        //         let lhs = iter.next().unwrap(); // peeked in the match
+        //         if match_next(&mut iter, &[TokenType::Equal]).is_some() {
+        //             let rhs = parse_assignment(&mut iter)?;
+        //             Ok(Expr::Assign(lhs, Box::new(rhs)))
+        //         }
+        //         else {
+        //             Err(41)
+        //         }
+        //     }
+        //     _ => parse_equality(&mut iter)
+        // }
     }
-    else {
-        parse_stmt(&mut iter)
+
+    fn parse_expression(&mut self) -> Result<Expr, usize> {
+        self.parse_assignment()
+    }
+
+    fn parse_exprstmt(&mut self) -> Result<Stmt, usize> {
+        let expr = self.parse_expression()?;
+        if self.match_next(&[TokenType::Semicolon]).is_some() {
+            Ok(Stmt::Expression(expr))
+        } else {
+            Err(22)
+        }
+    }
+
+    fn parse_block(&mut self) -> Result<Stmt, usize> {
+        let mut stmts = vec![];
+        while self.iter.peek().is_some()
+            && self.iter.peek().map(|t| &t.token_type) != Some(&TokenType::RightBrace)
+        {
+            stmts.push(self.parse_decl()?);
+        }
+        // drop right brace
+        self.iter.next();
+        Ok(Stmt::Block(stmts))
+    }
+
+    fn parse_stmt(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::Print]).is_some() {
+            return self.parse_print();
+        }
+
+        if self.match_next(&[TokenType::LeftBrace]).is_some() {
+            return self.parse_block();
+        }
+
+        self.parse_exprstmt()
+    }
+
+    fn parse_vardecl(&mut self) -> Result<Stmt, usize> {
+        if let Some(_) = self.match_next(&[TokenType::Var]) {
+            if let Some(id) = self.iter.next() {
+                match id {
+                    t
+                    @
+                    Token {
+                        token_type: TokenType::Identifier(_),
+                        ..
+                    } => {
+                        let expr = if self.match_next(&[TokenType::Equal]).is_some() {
+                            self.parse_expression()?
+                        } else {
+                            Expr::Leaf(Token {
+                                token_type: TokenType::Nil,
+                                line: t.line,
+                            })
+                        };
+                        if self.match_next(&[TokenType::Semicolon]).is_none() {
+                            Err(44)
+                        } else {
+                            Ok(Stmt::Var(t, expr))
+                        }
+                    }
+                    _ => Err(32),
+                }
+            } else {
+                Err(31)
+            }
+        } else {
+            Err(30)
+        }
+    }
+
+    fn parse_decl(&mut self) -> Result<Stmt, usize> {
+        if self.iter.peek().map(|t| &t.token_type) == Some(&TokenType::Var) {
+            self.parse_vardecl()
+        } else {
+            self.parse_stmt()
+        }
     }
 }
 
@@ -254,13 +246,15 @@ pub fn parse<'a, I>(tokens: I) -> Vec<Stmt>
 where
     I: IntoIterator<Item = Token>,
 {
+    let mut parser = Parser {
+        iter: tokens.into_iter().peekable(),
+    };
     let mut res = vec![];
-    let mut iter = tokens.into_iter().peekable();
-    while !iter.peek().is_none() {
-        if let Ok(stmt) = parse_decl(&mut iter) {
+    while !parser.iter.peek().is_none() {
+        if let Ok(stmt) = parser.parse_decl() {
             res.push(stmt);
         } else {
-            iter.next(); // skip unparsable token
+            parser.iter.next(); // skip unparsable token
         }
     }
     res

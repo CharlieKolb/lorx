@@ -1,4 +1,4 @@
-use crate::environment::{ EnvStack };
+use crate::environment::EnvStack;
 use crate::parser::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
@@ -163,8 +163,8 @@ impl Interpreter {
                     self.eval_decl(token, expr)?;
                 }
                 Stmt::Block(stmts) => {
-                     self.eval_block(stmts)?; 
-                    }
+                    self.eval_block(stmts)?;
+                }
             }
         }
 

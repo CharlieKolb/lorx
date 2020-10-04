@@ -1,4 +1,4 @@
-use std::collections::{ VecDeque, HashMap };
+use std::collections::{HashMap, VecDeque};
 
 use crate::value::Value;
 
@@ -8,7 +8,11 @@ pub struct EnvStack {
 }
 
 impl Default for EnvStack {
-    fn default() -> Self { Self { envs: VecDeque::from(vec![Default::default()]) } }
+    fn default() -> Self {
+        Self {
+            envs: VecDeque::from(vec![Default::default()]),
+        }
+    }
 }
 
 impl EnvStack {
@@ -47,13 +51,10 @@ impl EnvStack {
                 return Ok(val);
             }
         }
-        
+
         Err(47)
     }
-
 }
-
-
 
 #[derive(Debug, Clone, Default)]
 pub struct Environment {
