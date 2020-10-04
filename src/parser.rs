@@ -9,6 +9,7 @@ pub enum Expr {
     Assign(String, Box<Expr>),
     Unary(Token, Box<Expr>),
     Binary(Token, Box<Expr>, Box<Expr>),
+    Logical(Token, Box<Expr>, Box<Expr>),
     Grouping(Box<Expr>),
 }
 
@@ -131,8 +132,31 @@ where
         }
     }
 
+    fn parse_logic_and(&mut self) -> Result<Expr, usize> {
+        let mut expr = self.parse_equality()?;
+
+        while let Some(op) = self.match_next(&[TokenType::And]) {
+            let rhs = self.parse_equality()?;
+            expr = Expr::Logical(op, Box::new(expr), Box::new(rhs));
+        }
+
+        Ok(expr)
+    }
+
+
+    fn parse_logic_or(&mut self) -> Result<Expr, usize> {
+        let mut expr = self.parse_logic_and()?;
+
+        while let Some(op) = self.match_next(&[TokenType::Or]) {
+            let rhs = self.parse_logic_and()?;
+            expr = Expr::Logical(op, Box::new(expr), Box::new(rhs));
+        }
+
+        Ok(expr)
+    }
+
     fn parse_assignment(&mut self) -> Result<Expr, usize> {
-        let expr = self.parse_equality()?;
+        let expr = self.parse_logic_or()?;
 
         if self.match_next(&[TokenType::Equal]).is_some() {
             let rhs = self.parse_assignment()?;

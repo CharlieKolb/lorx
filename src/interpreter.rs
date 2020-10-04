@@ -78,6 +78,23 @@ impl Interpreter {
         })
     }
 
+    fn eval_logical(
+        &mut self,
+        token: Token,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    ) -> Result<Value, usize> {
+        let lhs_val = self.eval_expr(*lhs)?;
+
+        Ok(match token.token_type {
+            TokenType::Or => if is_truthy(&lhs_val) { lhs_val } else { self.eval_expr(*rhs)? },
+            TokenType::And => if !is_truthy(&lhs_val) { lhs_val } else { self.eval_expr(*rhs)? },
+            _ => {
+                return Err(55);
+            }
+        })
+    }
+
     fn eval_unary(&mut self, token: Token, rhs: Box<Expr>) -> Result<Value, usize> {
         let rhs_val = cast_to_num(&self.eval_expr(*rhs)?)?;
 
@@ -115,6 +132,7 @@ impl Interpreter {
             Expr::Assign(s, rhs) => self.eval_assign(s, rhs),
             Expr::Unary(t, rhs) => self.eval_unary(t, rhs),
             Expr::Binary(t, lhs, rhs) => self.eval_binary(t, lhs, rhs),
+            Expr::Logical(t, lhs, rhs) => self.eval_logical(t, lhs, rhs),
             Expr::Grouping(expr) => self.eval_expr(*expr),
             _ => Err(17),
         }
