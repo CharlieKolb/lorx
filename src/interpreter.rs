@@ -150,6 +150,16 @@ impl Interpreter {
         eval_res
     }
 
+    fn eval_if(&mut self, cond: Expr, lhs: Stmt, rhs: Option<Stmt>) -> Result<(), usize> {
+        if is_truthy(&self.eval_expr(cond)?) {
+            self.evaluate(vec![lhs])?;
+        } else if let Some(rhs_expr) = rhs {
+            self.evaluate(vec![rhs_expr])?;
+        }
+
+        Ok(())
+    }
+
     pub fn evaluate(&mut self, stmts: Vec<Stmt>) -> Result<(), usize> {
         for stmt in stmts {
             match stmt {
@@ -164,6 +174,9 @@ impl Interpreter {
                 }
                 Stmt::Block(stmts) => {
                     self.eval_block(stmts)?;
+                }
+                Stmt::If(cond, lhs, rhs) => {
+                    self.eval_if(cond, *lhs, *rhs)?;
                 }
             }
         }

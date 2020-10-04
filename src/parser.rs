@@ -18,6 +18,7 @@ pub enum Stmt {
     Print(Expr),
     Var(Token, Expr),
     Block(Vec<Stmt>),
+    If(Expr, Box<Stmt>, Box<Option<Stmt>>),
 }
 
 struct Parser<I>
@@ -187,7 +188,31 @@ where
         Ok(Stmt::Block(stmts))
     }
 
+    fn parse_if(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::LeftParen]).is_none() {
+            return Err(51);
+        }
+
+        let cond = self.parse_expression()?;
+
+        if self.match_next(&[TokenType::RightParen]).is_none() {
+            return Err(51);
+        }
+
+        let then_branch = self.parse_stmt()?;
+        let else_branch = if self.match_next(&[TokenType::Else]).is_some() {
+            Some(self.parse_stmt()?)
+        } else {
+            None
+        };
+
+        Ok(Stmt::If(cond, Box::new(then_branch), Box::new(else_branch)))
+    }
+
     fn parse_stmt(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::If]).is_some() {
+            return self.parse_if();
+        }
         if self.match_next(&[TokenType::Print]).is_some() {
             return self.parse_print();
         }
