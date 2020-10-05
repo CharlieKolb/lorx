@@ -248,7 +248,62 @@ where
         Ok(Stmt::While(cond, Box::new(body)))
     }
 
+    fn parse_for(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::LeftParen]).is_none() {
+            return Err(61);
+        }
+
+        let initializer = if self.match_next(&[TokenType::Semicolon]).is_some() {
+            None
+        } else if self.match_next(&[TokenType::Var]).is_some() {
+            Some(self.parse_vardecl()?)
+        } else {
+            Some(self.parse_exprstmt()?)
+        };
+
+        let cond = if let Some(sc) = self.match_next(&[TokenType::Semicolon]) {
+            Expr::Leaf(Token {
+                token_type: TokenType::True,
+                line: sc.line,
+            })
+        } else {
+            self.parse_expression()?
+        };
+
+        if self.match_next(&[TokenType::Semicolon]).is_none() {
+            return Err(62);
+        }
+
+        let increment = if self.iter.peek().map(|t| &t.token_type) == Some(&TokenType::RightParen) {
+            None
+        } else {
+            Some(self.parse_expression()?)
+        };
+
+        if self.match_next(&[TokenType::RightParen]).is_none() {
+            return Err(63);
+        }
+
+        let mut body = self.parse_stmt()?;
+
+        if let Some(incr) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expression(incr)]);
+        };
+
+        body = Stmt::While(cond, Box::new(body));
+
+        if let Some(init) = initializer {
+            body = Stmt::Block(vec![init, body]);
+        }
+
+        Ok(body)
+    }
+
     fn parse_stmt(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::For]).is_some() {
+            return self.parse_for();
+        }
+
         if self.match_next(&[TokenType::If]).is_some() {
             return self.parse_if();
         }
@@ -269,41 +324,37 @@ where
     }
 
     fn parse_vardecl(&mut self) -> Result<Stmt, usize> {
-        if let Some(_) = self.match_next(&[TokenType::Var]) {
-            if let Some(id) = self.iter.next() {
-                match id {
-                    t
-                    @
-                    Token {
-                        token_type: TokenType::Identifier(_),
-                        ..
-                    } => {
-                        let expr = if self.match_next(&[TokenType::Equal]).is_some() {
-                            self.parse_expression()?
-                        } else {
-                            Expr::Leaf(Token {
-                                token_type: TokenType::Nil,
-                                line: t.line,
-                            })
-                        };
-                        if self.match_next(&[TokenType::Semicolon]).is_none() {
-                            Err(44)
-                        } else {
-                            Ok(Stmt::Var(t, expr))
-                        }
+        if let Some(id) = self.iter.next() {
+            match id {
+                t
+                @
+                Token {
+                    token_type: TokenType::Identifier(_),
+                    ..
+                } => {
+                    let expr = if self.match_next(&[TokenType::Equal]).is_some() {
+                        self.parse_expression()?
+                    } else {
+                        Expr::Leaf(Token {
+                            token_type: TokenType::Nil,
+                            line: t.line,
+                        })
+                    };
+                    if self.match_next(&[TokenType::Semicolon]).is_none() {
+                        Err(44)
+                    } else {
+                        Ok(Stmt::Var(t, expr))
                     }
-                    _ => Err(32),
                 }
-            } else {
-                Err(31)
+                _ => Err(32),
             }
         } else {
-            Err(30)
+            Err(31)
         }
     }
 
     fn parse_decl(&mut self) -> Result<Stmt, usize> {
-        if self.iter.peek().map(|t| &t.token_type) == Some(&TokenType::Var) {
+        if self.match_next(&[TokenType::Var]).is_some() {
             self.parse_vardecl()
         } else {
             self.parse_stmt()
