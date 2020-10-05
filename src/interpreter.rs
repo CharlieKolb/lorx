@@ -41,14 +41,9 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    fn eval_binary(
-        &mut self,
-        token: Token,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    ) -> Result<Value, usize> {
-        let lhs_val = self.eval_expr(*lhs)?;
-        let rhs_val = self.eval_expr(*rhs)?;
+    fn eval_binary(&mut self, token: &Token, lhs: &Expr, rhs: &Expr) -> Result<Value, usize> {
+        let lhs_val = self.eval_expr(lhs)?;
+        let rhs_val = self.eval_expr(rhs)?;
 
         Ok(match token.token_type {
             TokenType::Minus => Value::Number(cast_to_num(&lhs_val)? - cast_to_num(&rhs_val)?),
@@ -78,25 +73,32 @@ impl Interpreter {
         })
     }
 
-    fn eval_logical(
-        &mut self,
-        token: Token,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    ) -> Result<Value, usize> {
-        let lhs_val = self.eval_expr(*lhs)?;
+    fn eval_logical(&mut self, token: &Token, lhs: &Expr, rhs: &Expr) -> Result<Value, usize> {
+        let lhs_val = self.eval_expr(lhs)?;
 
         Ok(match token.token_type {
-            TokenType::Or => if is_truthy(&lhs_val) { lhs_val } else { self.eval_expr(*rhs)? },
-            TokenType::And => if !is_truthy(&lhs_val) { lhs_val } else { self.eval_expr(*rhs)? },
+            TokenType::Or => {
+                if is_truthy(&lhs_val) {
+                    lhs_val
+                } else {
+                    self.eval_expr(rhs)?
+                }
+            }
+            TokenType::And => {
+                if !is_truthy(&lhs_val) {
+                    lhs_val
+                } else {
+                    self.eval_expr(rhs)?
+                }
+            }
             _ => {
                 return Err(55);
             }
         })
     }
 
-    fn eval_unary(&mut self, token: Token, rhs: Box<Expr>) -> Result<Value, usize> {
-        let rhs_val = cast_to_num(&self.eval_expr(*rhs)?)?;
+    fn eval_unary(&mut self, token: &Token, rhs: &Expr) -> Result<Value, usize> {
+        let rhs_val = cast_to_num(&self.eval_expr(rhs)?)?;
 
         match token.token_type {
             TokenType::Minus => Ok(Value::Number(-rhs_val)),
@@ -104,18 +106,18 @@ impl Interpreter {
         }
     }
 
-    fn eval_assign(&mut self, name: String, rhs: Box<Expr>) -> Result<Value, usize> {
-        let rhs_val = self.eval_expr(*rhs)?;
+    fn eval_assign(&mut self, name: &str, rhs: &Expr) -> Result<Value, usize> {
+        let rhs_val = self.eval_expr(rhs)?;
 
-        self.envs.assign(name.as_str(), rhs_val.clone())?;
+        self.envs.assign(name, rhs_val.clone())?;
 
         Ok(rhs_val)
     }
 
-    fn eval_leaf(&self, token: Token) -> Result<Value, usize> {
-        Ok(match token.token_type {
-            TokenType::Text(s) => Value::Text(s),
-            TokenType::Number(n) => Value::Number(n),
+    fn eval_leaf(&self, token: &Token) -> Result<Value, usize> {
+        Ok(match &token.token_type {
+            TokenType::Text(s) => Value::Text(s.clone()),
+            TokenType::Number(n) => Value::Number(n.clone()),
             TokenType::True => Value::Boolean(true),
             TokenType::False => Value::Boolean(false),
             TokenType::Nil => Value::Nil,
@@ -126,25 +128,24 @@ impl Interpreter {
         })
     }
 
-    fn eval_expr(&mut self, expr: Expr) -> Result<Value, usize> {
+    fn eval_expr(&mut self, expr: &Expr) -> Result<Value, usize> {
         match expr {
             Expr::Leaf(t) => self.eval_leaf(t),
             Expr::Assign(s, rhs) => self.eval_assign(s, rhs),
             Expr::Unary(t, rhs) => self.eval_unary(t, rhs),
             Expr::Binary(t, lhs, rhs) => self.eval_binary(t, lhs, rhs),
             Expr::Logical(t, lhs, rhs) => self.eval_logical(t, lhs, rhs),
-            Expr::Grouping(expr) => self.eval_expr(*expr),
-            _ => Err(17),
+            Expr::Grouping(expr) => self.eval_expr(expr),
         }
     }
 
-    fn eval_print(&mut self, expr: Expr) -> Result<(), usize> {
+    fn eval_print(&mut self, expr: &Expr) -> Result<(), usize> {
         let val = self.eval_expr(expr)?;
         println!("{}", val.to_string());
         Ok(())
     }
 
-    fn eval_decl(&mut self, token: Token, expr: Expr) -> Result<(), usize> {
+    fn eval_decl(&mut self, token: &Token, expr: &Expr) -> Result<(), usize> {
         if let Token {
             token_type: TokenType::Identifier(s),
             ..
@@ -158,44 +159,59 @@ impl Interpreter {
         }
     }
 
-    fn eval_block(&mut self, stmts: Vec<Stmt>) -> Result<(), usize> {
+    fn eval_block(&mut self, stmts: &Vec<Stmt>) -> Result<(), usize> {
         self.envs.push_default();
+        let mut eval_res = Ok(());
         // take eval_res here to ensure we always call pop even on failure
         // could use defer crate or similar for pop instead!
-        let eval_res = self.evaluate(stmts);
+        for stmt in stmts {
+            let res = self.evaluate(stmt);
+            if res.is_err() {
+                eval_res = res;
+            }
+        }
         self.envs.pop()?;
 
         eval_res
     }
 
-    fn eval_if(&mut self, cond: Expr, lhs: Stmt, rhs: Option<Stmt>) -> Result<(), usize> {
+    fn eval_if(&mut self, cond: &Expr, lhs: &Stmt, rhs: &Option<Stmt>) -> Result<(), usize> {
         if is_truthy(&self.eval_expr(cond)?) {
-            self.evaluate(vec![lhs])?;
+            self.evaluate(lhs)?;
         } else if let Some(rhs_expr) = rhs {
-            self.evaluate(vec![rhs_expr])?;
+            self.evaluate(rhs_expr)?;
         }
 
         Ok(())
     }
 
-    pub fn evaluate(&mut self, stmts: Vec<Stmt>) -> Result<(), usize> {
-        for stmt in stmts {
-            match stmt {
-                Stmt::Expression(expr) => {
-                    self.eval_expr(expr)?;
-                }
-                Stmt::Print(expr) => {
-                    self.eval_print(expr)?;
-                }
-                Stmt::Var(token, expr) => {
-                    self.eval_decl(token, expr)?;
-                }
-                Stmt::Block(stmts) => {
-                    self.eval_block(stmts)?;
-                }
-                Stmt::If(cond, lhs, rhs) => {
-                    self.eval_if(cond, *lhs, *rhs)?;
-                }
+    fn eval_while(&mut self, cond: &Expr, body: &Stmt) -> Result<(), usize> {
+        while is_truthy(&self.eval_expr(cond)?) {
+            self.evaluate(body)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn evaluate(&mut self, stmt: &Stmt) -> Result<(), usize> {
+        match stmt {
+            Stmt::Expression(expr) => {
+                self.eval_expr(expr)?;
+            }
+            Stmt::Print(expr) => {
+                self.eval_print(expr)?;
+            }
+            Stmt::Var(token, expr) => {
+                self.eval_decl(token, expr)?;
+            }
+            Stmt::Block(stmts) => {
+                self.eval_block(stmts)?;
+            }
+            Stmt::If(cond, lhs, rhs) => {
+                self.eval_if(cond, &*lhs, &*rhs)?;
+            }
+            Stmt::While(cond, body) => {
+                self.eval_while(cond, &*body)?;
             }
         }
 

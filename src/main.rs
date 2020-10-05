@@ -36,8 +36,13 @@ fn main() -> std::io::Result<()> {
     let parse_tree = parser::parse(tokens);
     println!("{:#?}", parse_tree);
     let mut interpreter: interpreter::Interpreter = Default::default();
-    let res = interpreter.evaluate(parse_tree);
-    println!("{:#?}", res);
+    for stmt in parse_tree {
+        let res = interpreter.evaluate(&stmt);
+        if res.is_err() {
+            println!("{:#?}", res);
+            println!("{:#?}", interpreter);
+        }
+    }
     println!("{:#?}", interpreter);
     Ok(())
 }

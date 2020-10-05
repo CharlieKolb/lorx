@@ -20,6 +20,7 @@ pub enum Stmt {
     Var(Token, Expr),
     Block(Vec<Stmt>),
     If(Expr, Box<Stmt>, Box<Option<Stmt>>),
+    While(Expr, Box<Stmt>),
 }
 
 struct Parser<I>
@@ -143,7 +144,6 @@ where
         Ok(expr)
     }
 
-
     fn parse_logic_or(&mut self) -> Result<Expr, usize> {
         let mut expr = self.parse_logic_and()?;
 
@@ -233,12 +233,32 @@ where
         Ok(Stmt::If(cond, Box::new(then_branch), Box::new(else_branch)))
     }
 
+    fn parse_while(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::LeftParen]).is_none() {
+            return Err(51);
+        }
+
+        let cond = self.parse_expression()?;
+
+        if self.match_next(&[TokenType::RightParen]).is_none() {
+            return Err(51);
+        }
+        let body = self.parse_stmt()?;
+
+        Ok(Stmt::While(cond, Box::new(body)))
+    }
+
     fn parse_stmt(&mut self) -> Result<Stmt, usize> {
         if self.match_next(&[TokenType::If]).is_some() {
             return self.parse_if();
         }
+
         if self.match_next(&[TokenType::Print]).is_some() {
             return self.parse_print();
+        }
+
+        if self.match_next(&[TokenType::While]).is_some() {
+            return self.parse_while();
         }
 
         if self.match_next(&[TokenType::LeftBrace]).is_some() {
