@@ -161,7 +161,7 @@ fn get_next_token_type<'a>(
             }
         }
         // todo handle unsupported characters with an error type or something
-        _ => return Err(0),
+        _ => return Err(1002),
     })
 }
 

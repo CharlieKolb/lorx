@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
-use crate::value::Value;
+use crate::globals;
+use crate::value::{Er, Value};
 
 #[derive(Debug, Clone)]
 pub struct EnvStack {
@@ -9,9 +10,15 @@ pub struct EnvStack {
 
 impl Default for EnvStack {
     fn default() -> Self {
-        Self {
-            envs: VecDeque::from(vec![Default::default()]),
-        }
+        let mut env_stack = EnvStack {
+            envs: VecDeque::default(),
+        };
+        env_stack.push_default();
+        env_stack.define(
+            "clock",
+            Value::Callable(std::rc::Rc::new(globals::Clock {})),
+        );
+        env_stack
     }
 }
 
@@ -24,8 +31,8 @@ impl EnvStack {
         self.envs.push_back(env)
     }
 
-    pub fn pop(&mut self) -> Result<(), usize> {
-        self.envs.pop_back().map(|_| ()).ok_or(45)
+    pub fn pop(&mut self) -> Result<(), Er> {
+        self.envs.pop_back().map(|_| ()).ok_or(Er::Code(45))
     }
 
     pub fn define(&mut self, name: &str, value: Value) {
@@ -34,7 +41,7 @@ impl EnvStack {
         }
     }
 
-    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), usize> {
+    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), Er> {
         for env in self.envs.iter_mut().rev() {
             if env.get(name).is_ok() {
                 env.assign(name, value).ok();
@@ -42,17 +49,17 @@ impl EnvStack {
             }
         }
 
-        Err(46)
+        Err(Er::Code(46))
     }
 
-    pub fn get(&self, name: &str) -> Result<&Value, usize> {
+    pub fn get(&self, name: &str) -> Result<&Value, Er> {
         for env in self.envs.iter().rev() {
             if let Ok(val) = env.get(name) {
                 return Ok(val);
             }
         }
 
-        Err(47)
+        Err(Er::Code(47))
     }
 }
 
@@ -66,12 +73,12 @@ impl Environment {
         self.values.insert(name.to_string(), value);
     }
 
-    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), usize> {
+    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), Er> {
         if self.values.get(name).is_some() {
             self.values.insert(name.to_string(), value);
             Ok(())
         } else {
-            Err(43)
+            Err(Er::Code(43))
         }
     }
 

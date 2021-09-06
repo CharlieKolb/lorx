@@ -3,7 +3,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+mod callable;
 mod environment;
+mod globals;
 mod interpreter;
 mod parser;
 mod scanner;

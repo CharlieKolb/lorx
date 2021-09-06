@@ -1,5 +1,4 @@
 use crate::token::{Token, TokenType};
-
 use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
@@ -11,13 +10,22 @@ pub enum Expr {
     Binary(Token, Box<Expr>, Box<Expr>),
     Logical(Token, Box<Expr>, Box<Expr>),
     Grouping(Box<Expr>),
+    Call(Token, Box<Expr>, Vec<Expr>),
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtFunction {
+    pub name: String,
+    pub params: Vec<String>,
+    pub body: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expression(Expr),
+    Function(StmtFunction),
     Print(Expr),
-    Var(Token, Expr),
+    Var(String, Expr),
     Block(Vec<Stmt>),
     If(Expr, Box<Stmt>, Box<Option<Stmt>>),
     While(Expr, Box<Stmt>),
@@ -35,12 +43,26 @@ where
     I: Iterator<Item = Token>,
 {
     fn match_next(&mut self, options: &[TokenType]) -> Option<Token> {
-        for token_type in options {
-            if self.iter.peek().map(|t| &t.token_type) == Some(&token_type) {
+        if let Some(ttype) = self.iter.peek().map(|t| &t.token_type) {
+            if options.contains(ttype) {
                 return self.iter.next();
-            };
-        }
+            }
+        };
         None
+    }
+
+    // Return the next Token if it is an identifier, or an Err otherwise
+    fn parse_identifier(&mut self) -> Result<(String, Token), usize> {
+        if let Some(id) = self.iter.next() {
+            if let Token {
+                token_type: TokenType::Identifier(s),
+                ..
+            } = id.clone()
+            {
+                return Ok((s, id));
+            }
+        }
+        Err(1009)
     }
 
     fn parse_primary(&mut self) -> Result<Expr, usize> {
@@ -70,8 +92,39 @@ where
                 _ => return Err(33),
             })
         } else {
-            Err(0) // Ran out of elements
+            Err(1010) // Ran out of elements
         }
+    }
+
+    fn parse_call(&mut self) -> Result<Expr, usize> {
+        let mut lhs = self.parse_primary()?;
+
+        while let Some(mut par) = self.match_next(&[TokenType::LeftParen]) {
+            let mut args = vec![];
+            if let Some(right_par) = self.match_next(&[TokenType::RightParen]) {
+                par = right_par;
+            } else {
+                loop {
+                    if args.len() >= 255 {
+                        // todo properly log error here
+                        println!("Too many arguments");
+                    }
+                    args.push(self.parse_expression()?);
+                    if self.match_next(&[TokenType::Comma]).is_none() {
+                        break;
+                    }
+                }
+                if let Some(right_par) = self.match_next(&[TokenType::RightParen]) {
+                    par = right_par;
+                } else {
+                    return Err(1051);
+                }
+            }
+
+            lhs = Expr::Call(par, Box::new(lhs), args);
+        }
+
+        Ok(lhs)
     }
 
     fn parse_unary(&mut self) -> Result<Expr, usize> {
@@ -80,7 +133,7 @@ where
             return Ok(Expr::Unary(op, Box::new(rhs)));
         }
 
-        self.parse_primary()
+        self.parse_call()
     }
 
     fn parse_multiplication(&mut self) -> Result<Expr, usize> {
@@ -324,38 +377,66 @@ where
     }
 
     fn parse_vardecl(&mut self) -> Result<Stmt, usize> {
-        if let Some(id) = self.iter.next() {
-            match id {
-                t
-                @
-                Token {
-                    token_type: TokenType::Identifier(_),
-                    ..
-                } => {
-                    let expr = if self.match_next(&[TokenType::Equal]).is_some() {
-                        self.parse_expression()?
-                    } else {
-                        Expr::Leaf(Token {
-                            token_type: TokenType::Nil,
-                            line: t.line,
-                        })
-                    };
-                    if self.match_next(&[TokenType::Semicolon]).is_none() {
-                        Err(44)
-                    } else {
-                        Ok(Stmt::Var(t, expr))
-                    }
-                }
-                _ => Err(32),
-            }
+        let (s, t) = self.parse_identifier()?;
+        let expr = if self.match_next(&[TokenType::Equal]).is_some() {
+            self.parse_expression()?
         } else {
-            Err(31)
+            Expr::Leaf(Token {
+                token_type: TokenType::Nil,
+                line: t.line,
+            })
+        };
+        if self.match_next(&[TokenType::Semicolon]).is_none() {
+            Err(44)
+        } else {
+            Ok(Stmt::Var(s, expr))
+        }
+    }
+
+    fn parse_fun(&mut self) -> Result<Stmt, usize> {
+        let (name, _) = self.parse_identifier()?;
+        if self.match_next(&[TokenType::LeftParen]).is_none() {
+            return Err(1071);
+        }
+
+        let mut params = vec![];
+        if self.match_next(&[TokenType::RightParen]).is_none() {
+            loop {
+                params.push(self.parse_identifier()?.0);
+                if self.match_next(&[TokenType::Comma]).is_none() {
+                    break;
+                }
+            }
+            if self.match_next(&[TokenType::RightParen]).is_none() {
+                return Err(1074);
+            }
+        }
+
+        if params.len() >= 255 {
+            // todo proper logging
+            println!("function has too many arguments!");
+        }
+
+        // Consume { as parse_block requires it
+        if self.match_next(&[TokenType::LeftBrace]).is_none() {
+            return Err(1075);
+        }
+
+        if let Stmt::Block(body) = self.parse_block()? {
+            return Ok(Stmt::Function(StmtFunction { name, params, body }));
+        } else {
+            return Err(1073);
         }
     }
 
     fn parse_decl(&mut self) -> Result<Stmt, usize> {
-        if self.match_next(&[TokenType::Var]).is_some() {
-            self.parse_vardecl()
+        let next_token = self.match_next(&[TokenType::Var, TokenType::Fun]);
+        if let Some(token) = next_token {
+            match token.token_type {
+                TokenType::Fun => self.parse_fun(),
+                TokenType::Var => self.parse_vardecl(),
+                _ => unreachable!(),
+            }
         } else {
             self.parse_stmt()
         }
