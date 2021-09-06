@@ -185,19 +185,19 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn eval_block(&mut self, stmts: &Vec<Stmt>) -> Result<Value, Er> {
+    pub fn eval_block(&mut self, stmts: &Vec<Stmt>) -> Result<(), Er> {
         self.envs.push_default();
-        let mut eval_res = Ok(Value::Nil);
         // take eval_res here to ensure we always call pop even on failure
         // could use defer crate or similar for pop instead!
         for stmt in stmts {
             let res = self.evaluate(stmt);
-            if let Err(e) = res {
-                eval_res = Err(e);
+            if res.is_err() {
+                self.envs.pop()?;
+                return res;
             }
         }
         self.envs.pop()?;
-        eval_res
+        Ok(())
     }
 
     fn eval_if(&mut self, cond: &Expr, lhs: &Stmt, rhs: &Option<Stmt>) -> Result<(), Er> {
@@ -227,6 +227,9 @@ impl Interpreter {
                 self.eval_fun_decl(Function {
                     declaration: stmt_function.clone(),
                 })?;
+            }
+            Stmt::Return(expr) => {
+                return Err(Er::Return(self.eval_expr(expr)?));
             }
             Stmt::Print(expr) => {
                 self.eval_print(expr)?;

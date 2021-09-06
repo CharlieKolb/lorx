@@ -24,6 +24,7 @@ pub struct StmtFunction {
 pub enum Stmt {
     Expression(Expr),
     Function(StmtFunction),
+    Return(Expr),
     Print(Expr),
     Var(String, Expr),
     Block(Vec<Stmt>),
@@ -301,6 +302,23 @@ where
         Ok(Stmt::While(cond, Box::new(body)))
     }
 
+    fn parse_return(&mut self) -> Result<Stmt, usize> {
+        if let Some(t) = self.match_next(&[TokenType::Semicolon]) {
+            return Ok(Stmt::Return(Expr::Leaf(Token {
+                token_type: TokenType::Nil,
+                line: t.line,
+            })));
+        }
+
+        let expr = self.parse_expression()?;
+
+        if self.match_next(&[TokenType::Semicolon]).is_none() {
+            Err(1110)
+        } else {
+            Ok(Stmt::Return(expr))
+        }
+    }
+
     fn parse_for(&mut self) -> Result<Stmt, usize> {
         if self.match_next(&[TokenType::LeftParen]).is_none() {
             return Err(61);
@@ -353,6 +371,10 @@ where
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, usize> {
+        if self.match_next(&[TokenType::Return]).is_some() {
+            return self.parse_return();
+        }
+
         if self.match_next(&[TokenType::For]).is_some() {
             return self.parse_for();
         }

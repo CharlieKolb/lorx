@@ -27,6 +27,10 @@ impl Callable for Function {
         let ret = interpreter.eval_block(&self.declaration.body);
         interpreter.envs.pop()?;
         std::mem::swap(&mut interpreter.envs, &mut temp);
-        ret
+        match ret {
+            Err(Er::Return(r)) => Ok(r),
+            Err(e) => Err(e),
+            Ok(()) => Ok(Value::Nil),
+        }
     }
 }
