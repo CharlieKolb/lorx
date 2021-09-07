@@ -306,7 +306,7 @@ where
         if let Some(t) = self.match_next(&[TokenType::Semicolon]) {
             return Ok(Stmt::Return(Expr::Leaf(Token {
                 token_type: TokenType::Nil,
-                line: t.line,
+                ..t
             })));
         }
 
@@ -335,7 +335,7 @@ where
         let cond = if let Some(sc) = self.match_next(&[TokenType::Semicolon]) {
             Expr::Leaf(Token {
                 token_type: TokenType::True,
-                line: sc.line,
+                ..sc
             })
         } else {
             self.parse_expression()?
@@ -405,7 +405,7 @@ where
         } else {
             Expr::Leaf(Token {
                 token_type: TokenType::Nil,
-                line: t.line,
+                ..t
             })
         };
         if self.match_next(&[TokenType::Semicolon]).is_none() {
@@ -474,11 +474,14 @@ where
     };
     let mut res = vec![];
     while !parser.iter.peek().is_none() {
-        if let Ok(stmt) = parser.parse_decl() {
-            res.push(stmt);
-        } else {
-            parser.iter.next(); // skip unparsable token
+        match parser.parse_decl() {
+            Ok(stmt) => res.push(stmt),
+            Err(e) => {
+                println!("Parser error {}!", e);
+                parser.iter.next(); // skip unparsable token
+            }
         }
+
     }
     res
 }

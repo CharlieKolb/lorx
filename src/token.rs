@@ -95,4 +95,5 @@ pub enum TokenType {
 pub struct Token {
     pub token_type: TokenType,
     pub line: usize,
+    pub col: usize, // note that this won't be the exact col, just different for meaningful nodes (e.g. two variables called 'a' will have different col if in different locations) ((Todo double check that is true for all cases))
 }

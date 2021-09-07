@@ -42,6 +42,14 @@ fn main() -> std::io::Result<()> {
         envs: environment::EnvStack::<value::Value>::with_globals(&(globals::Globals::new().functions)),
         locals: Default::default(),
     };
+
+    {
+        let mut resolver = resolver::Resolver::default();
+        for stmt in &parse_tree {
+            resolver.resolve_stmt(stmt);
+        }
+    }
+
     for stmt in parse_tree {
         let res = interpreter.evaluate(&stmt);
         if res.is_err() {

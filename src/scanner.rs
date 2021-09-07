@@ -171,9 +171,11 @@ fn scan_token<'a>(
     mut current: &mut usize,
     mut line: &mut usize,
 ) -> Result<Token, usize> {
+    let token_type =  get_next_token_type(c, &mut iter, &mut current, &mut line)?;
     Ok(Token {
-        token_type: get_next_token_type(c, &mut iter, &mut current, &mut line)?,
+        token_type,
         line: line.clone(),
+        col: if *current == 0 { 0 } else { *current - 1 },
     })
 }
 

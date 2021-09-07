@@ -2,9 +2,10 @@ use crate::interpreter::Interpreter;
 use crate::environment::EnvStack;
 use crate::parser::{ Stmt, Expr, StmtFunction };
 use crate::value::{ Value, Er };
+use crate::token::{ Token, TokenType };
 
 #[derive(Debug, Default)]
-struct Resolver {
+pub struct Resolver {
     interpreter: Interpreter,
     env: EnvStack::<bool>,
 }
@@ -36,6 +37,16 @@ impl Resolver {
         }
     }
 
+    // Return the resolved depth, or None if global
+    fn resolve_local(&mut self, name: &str) -> Option<usize> {
+        if self.env.get(name).ok().copied() == Some(false) {
+            // todo proper logging
+            println!("Cannot read local variable in its own initializer");
+        }
+
+        self.env.resolve_depth(name)
+    }
+
     fn resolve_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Assign(name, exp) => {
@@ -45,7 +56,7 @@ impl Resolver {
                     println!("Cannot read local variable in its own initializer");
                 }
 
-                if let Some(depth) = self.env.resolve_depth(name) {
+                if let Some(depth) = self.resolve_local(name) {
                     self.interpreter.resolve(exp, depth)
                 };
             }
@@ -62,7 +73,14 @@ impl Resolver {
             Expr::Grouping(expr) | Expr::Unary(_, expr) => {
                 self.resolve_expr(expr);
             }
-            Expr::Leaf(_) => (),
+            Expr::Leaf(t) => {
+                if let Token { token_type: TokenType::Identifier(name), .. } = t {
+                    println!("t: {:?}", t);
+                    if let Some(depth) = self.resolve_local(name) {
+                        self.interpreter.resolve(expr, depth)
+                    };
+                }
+            },
         }
     }
 
