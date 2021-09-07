@@ -1,10 +1,10 @@
 use crate::token::{Token, TokenType};
 use std::iter::Peekable;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     Leaf(Token),
-    // Variable(Token), // probably won't need this?
+    // Variable(Token), // probably won't need this as we turn "var x;" into "var x = null;"?
     Assign(String, Box<Expr>),
     Unary(Token, Box<Expr>),
     Binary(Token, Box<Expr>, Box<Expr>),

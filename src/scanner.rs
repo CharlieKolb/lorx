@@ -136,7 +136,7 @@ fn get_next_token_type<'a>(
             }
 
             if let Ok(f) = res.parse::<f64>() {
-                TokenType::Number(f)
+                TokenType::Number(res)
             } else {
                 panic!();
                 // todo return an Error token here

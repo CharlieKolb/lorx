@@ -2,6 +2,20 @@ use crate::callable::Callable;
 use crate::interpreter::Interpreter;
 use crate::value::{Er, Value};
 
+pub struct Globals {
+    pub functions: Vec<(String, Value)>,
+}
+
+impl Globals {
+    pub fn new() -> Self {
+        Globals {
+            functions: vec![
+                ("clock".to_string(), Value::Callable(std::rc::Rc::new(Clock {})))
+            ]
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Clock {}
 

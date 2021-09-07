@@ -17,6 +17,12 @@ pub enum Value {
     Callable(Rc<dyn Callable>),
 }
 
+impl Default for Value {
+    fn default() -> Self {
+        Value::Nil
+    }
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         self == other

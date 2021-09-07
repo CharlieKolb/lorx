@@ -4,6 +4,8 @@ use crate::parser::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 use crate::value::{Er, Value};
 
+use std::collections::HashMap;
+
 fn cast_to_num(v: &Value) -> Result<f64, Er> {
     if let Value::Number(n) = v {
         Ok(*n)
@@ -39,7 +41,8 @@ fn is_equal(lhs: &Value, rhs: &Value) -> bool {
 
 #[derive(Debug, Default)]
 pub struct Interpreter {
-    pub envs: EnvStack,
+    pub envs: EnvStack<Value>,
+    pub locals: HashMap<Expr, usize>,
 }
 
 impl Interpreter {
@@ -121,7 +124,7 @@ impl Interpreter {
     fn eval_leaf(&self, token: &Token) -> Result<Value, Er> {
         Ok(match &token.token_type {
             TokenType::Text(s) => Value::Text(s.clone()),
-            TokenType::Number(n) => Value::Number(n.clone()),
+            TokenType::Number(n) => Value::Number(n.parse::<f64>().unwrap()), // safe unwrap as scanner checks that the string can be converted to a number
             TokenType::True => Value::Boolean(true),
             TokenType::False => Value::Boolean(false),
             TokenType::Nil => Value::Nil,
@@ -216,6 +219,12 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        // this might just be bugged still, as Tokens in expression don't hold a reference to the lexeme, only kind and line
+        // question is whether there is a case where kind and line are equal, but resolved var is different? (e.g. whole program in one line?)
+        self.locals.insert(expr.clone(), depth);
     }
 
     pub fn evaluate(&mut self, stmt: &Stmt) -> Result<(), Er> {

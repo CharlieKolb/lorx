@@ -11,6 +11,7 @@ mod parser;
 mod scanner;
 mod token;
 mod value;
+mod resolver;
 
 const DEFAULT_PROGRAM_PATH: &'static str = "./programs/testProgram.lox";
 
@@ -37,7 +38,10 @@ fn main() -> std::io::Result<()> {
     println!("{:?}", tokens);
     let parse_tree = parser::parse(tokens);
     println!("{:#?}", parse_tree);
-    let mut interpreter: interpreter::Interpreter = Default::default();
+    let mut interpreter = interpreter::Interpreter {
+        envs: environment::EnvStack::<value::Value>::with_globals(&(globals::Globals::new().functions)),
+        locals: Default::default(),
+    };
     for stmt in parse_tree {
         let res = interpreter.evaluate(&stmt);
         if res.is_err() {
